@@ -16,8 +16,9 @@ app.get("/", (req, res) => {
 
 const scrapeMedium = async (query) => {
   const browser = await puppeteer.launch({
-    headless: true,
+    executablePath: '/usr/bin/google-chrome-stable',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: true
   });
   const page = await browser.newPage();
 
