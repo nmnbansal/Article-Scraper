@@ -14,9 +14,12 @@ app.get("/", (req, res) => {
   res.json({ msg: "Server is up!" });
 });
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// -------------------------Scrape Function------------------------------------
+
 const scrapeMedium = async (query) => {
   const browser = await puppeteer.launch({
-    executablePath: '/usr/bin/google-chrome-stable',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     headless: true
   });
@@ -26,6 +29,9 @@ const scrapeMedium = async (query) => {
     const searchUrl = `https://medium.com/search?q=${encodeURIComponent(query)}`;
     await page.goto(searchUrl, { waitUntil: 'networkidle2' });
 
+    // Random delay to mitigate anti-scraping mechanisms
+    await delay(Math.floor(Math.random() * 3000) + 1000);
+
     const articles = await page.evaluate(() => {
       const articlesArray = [];
       const articleElements = document.querySelectorAll('article');
@@ -34,14 +40,14 @@ const scrapeMedium = async (query) => {
         const titleElement = article.querySelector('h2');
         const authorElement = article.querySelector('p');
         const publishDateElement = article.querySelector('span');
-        const urlElement = article.querySelector('div[data-href]');
+        const urlElement = article.querySelector('a');
 
         if (titleElement && authorElement && publishDateElement && urlElement) {
           articlesArray.push({
             title: titleElement.textContent.trim(),
             author: authorElement.textContent.trim(),
             publicationDate: publishDateElement.textContent.trim() || "Unknown date",
-            link: urlElement.getAttribute('data-href')
+            link: urlElement.href
           });
         }
       });
@@ -52,11 +58,13 @@ const scrapeMedium = async (query) => {
     await browser.close();
     return articles;
   } catch (error) {
-    console.error("Error scraping Medium articles:", error);
+    console.error("Error during page evaluation:", error);
     await browser.close();
     throw error;
   }
 };
+
+// ------------------------Post Scrape -------------------------------------------
 
 app.post("/scrape", async (req, res) => {
   const { topic } = req.body;
@@ -72,10 +80,12 @@ app.post("/scrape", async (req, res) => {
 
     res.json(articles);
   } catch (error) {
-    console.error("Error scraping Medium articles:", error);
+    console.error("Error in /scrape endpoint:", error);
     res.status(500).json({ error: "Failed to scrape Medium articles" });
   }
 });
+
+// ----------------------Get Aricles-----------------------------------------------
 
 app.get("/articles", async (req, res) => {
   try {
